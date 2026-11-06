@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Pins transitive dependencies too, so every project resolves the same EF Core build. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <!-- Pinned to 12.x: last Apache-2.0 release line (13+ is commercially licensed). -->
@@ -11,6 +13,8 @@
   </ItemGroup>
   <ItemGroup Label="Persistence">
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.14" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.14" />
