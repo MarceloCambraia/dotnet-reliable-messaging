@@ -27,6 +27,14 @@ public static class DependencyInjection
 
         services.AddRabbitMqMessaging(configuration);
 
+        var outbox = configuration.GetSection(OutboxOptions.SectionName);
+        services.AddOptions<OutboxOptions>().Bind(outbox);
+        services.AddScoped<OutboxProcessor>();
+        if (outbox.GetValue(nameof(OutboxOptions.Enabled), defaultValue: true))
+        {
+            services.AddHostedService<OutboxPublisherService>();
+        }
+
         return services;
     }
 
