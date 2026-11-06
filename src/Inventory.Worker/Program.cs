@@ -1,3 +1,11 @@
-var builder = Host.CreateApplicationBuilder(args);
-var host = builder.Build();
-host.Run();
+namespace Inventory.Worker;
+
+internal static class Program
+{
+    public static async Task Main(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+        using var host = builder.Build();
+        await host.RunAsync();
+    }
+}

@@ -34,6 +34,10 @@ public static class DependencyInjection
         return services;
     }
 
-    public static IHealthChecksBuilder AddRabbitMq(this IHealthChecksBuilder builder, string name = "rabbitmq", params string[] tags) =>
-        builder.AddCheck<RabbitMqHealthCheck>(name, HealthStatus.Unhealthy, tags);
+    public static IHealthChecksBuilder AddRabbitMq(
+        this IHealthChecksBuilder builder,
+        string name = "rabbitmq",
+        HealthStatus failureStatus = HealthStatus.Unhealthy,
+        params string[] tags) =>
+        builder.AddCheck<RabbitMqHealthCheck>(name, failureStatus, tags);
 }
