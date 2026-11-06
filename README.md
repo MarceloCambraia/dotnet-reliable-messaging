@@ -311,12 +311,33 @@ Knowing what they do underneath makes them much easier to operate.
 - **Outbox state:** `GET /diagnostics/outbox` returns pending / processed / failed counts and the
   oldest pending message.
 
-<!--
-Screenshots: capture them after `docker compose up` and save them under docs/screenshots/, then
-uncomment these lines.
-![RabbitMQ queues with retry tiers and DLQ](docs/screenshots/rabbitmq-queues.png)
-![Jaeger trace from HTTP request to consumer](docs/screenshots/jaeger-trace.png)
--->
+## Screenshots
+
+Captured from `docker compose up` after running `./scripts/chaos.ps1 -Scenario dlq` and
+`-Scenario broker-down`.
+
+**An order placed while RabbitMQ was down.** The request returns `201` in 6 ms. Two publish
+attempts fail while the broker is stopped, the third succeeds about 10 s later, and the inventory
+worker consumes the message, all in the same trace. The consumer starts a few seconds after the
+publish because the worker was itself reconnecting with backoff; the message waited in the durable
+queue.
+
+![Jaeger: order created during a broker outage, published later](docs/screenshots/jaeger-trace.png)
+
+**A message that keeps failing.** One publish, then four failed `process` spans in the worker: the
+first delivery plus three retries, spaced by the retry queues' TTLs (2 s, 5 s, 10 s in compose).
+
+![Jaeger: consumer retries before the DLQ](docs/screenshots/jaeger-dlq-trace.png)
+
+**The same message in the DLQ.** It keeps its `message_id`, `correlation_id` and `traceparent`, and
+carries `x-retry-count: 3` plus the exception type and message for diagnosis.
+
+![Dead-lettered message with retry count and exception headers](docs/screenshots/rabbitmq-dlq-message.png)
+
+**All six demo orders in Jaeger.** Each trace spans both services and lasts ~17 s, because the
+publish or the consumption happened long after the request.
+
+![Jaeger search results for the demo orders](docs/screenshots/jaeger-search.png)
 
 ---
 
