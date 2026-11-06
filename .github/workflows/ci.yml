@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore
+
+      - name: Build (warnings are errors)
+        run: dotnet build --no-restore -c Release
+
+      # The runner has Docker, so Testcontainers starts real Postgres and RabbitMQ here.
+      - name: Test (unit + integration)
+        run: >
+          dotnet test --no-build -c Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+          --logger "trx"
+          --logger "console;verbosity=normal"
+
+      - name: Coverage report
+        if: always()
+        run: >
+          dotnet reportgenerator
+          -reports:"TestResults/**/coverage.cobertura.xml"
+          -targetdir:coverage
+          -reporttypes:"MarkdownSummaryGithub;Badges;HtmlInline"
+          -assemblyfilters:"-*Tests*"
+          -classfilters:"-*.Migrations.*;-*DbContextFactory"
+
+      - name: Coverage summary
+        if: always()
+        run: cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-and-coverage
+          path: |
+            TestResults/**/*.trx
+            coverage/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-badge
+          path: coverage/badge_linecoverage.svg
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate compose file
+        run: docker compose config --quiet
+      - name: Build images
+        run: docker compose build
+
+  # Publishes the coverage badge to an orphan "badges" branch, so the README can show it
+  # without any third-party service or token.
+  badge:
+    name: Publish coverage badge
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage-badge
+          path: badge
+
+      - name: Push badge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin badges; then
+            git fetch origin badges
+            git worktree add /tmp/badges badges
+          else
+            git worktree add --orphan -b badges /tmp/badges
+          fi
+          cp badge/badge_linecoverage.svg /tmp/badges/coverage.svg
+          cd /tmp/badges
+          git add coverage.svg
+          if git diff --cached --quiet; then
+            echo "Badge unchanged"
+          else
+            git commit -m "chore: update coverage badge [skip ci]"
+            git push origin badges
+          fi
