@@ -1,6 +1,8 @@
 # Next steps (candidate GitHub issues)
 
-Each item is written so it can be pasted as an issue.
+These items are tracked as [GitHub issues #1–#19](https://github.com/MarceloCambraia/dotnet-reliable-messaging/issues),
+labelled by area. Item 12 is done (see the README's Screenshots section), so it has no issue; the
+issue numbers therefore differ from the list numbers below from item 13 on.
 
 ## Production hardening
 1. **Outbox/inbox retention job.** Delete processed outbox rows and old inbox rows after a
@@ -22,8 +24,8 @@ Each item is written so it can be pasted as an issue.
    duration, parked messages. Add Prometheus and Grafana to compose, with an alert on outbox lag.
 10. **Consumer metrics:** processed / duplicate / retried / dead-lettered counters, and handler duration.
 11. **Worker health endpoint** (or a heartbeat file) for container health checks.
-12. **Screenshots/GIF** of the RabbitMQ management UI (retry tiers and DLQ) and of a Jaeger trace in
-    the README.
+12. ~~**Screenshots/GIF** of the RabbitMQ management UI (retry tiers and DLQ) and of a Jaeger trace in
+    the README.~~ Done.
 
 ## Operations tooling
 13. **DLQ replay endpoint or CLI:** list, inspect, replay one or all, purge, with an audit log.
