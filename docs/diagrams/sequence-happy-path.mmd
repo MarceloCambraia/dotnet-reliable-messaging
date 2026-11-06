@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Orders.Api
+    participant ODB as orders DB
+    participant P as Outbox Publisher
+    participant MQ as RabbitMQ
+    participant W as Inventory.Worker
+    participant IDB as inventory DB
+
+    C->>A: POST /orders
+    A->>ODB: BEGIN · INSERT order, items, outbox_message · COMMIT
+    A-->>C: 201 Created
+    P->>ODB: BEGIN · SELECT pending … FOR UPDATE SKIP LOCKED
+    P->>MQ: basic.publish (persistent, mandatory)
+    MQ-->>P: basic.ack (publisher confirm)
+    P->>ODB: UPDATE processed_at · COMMIT
+    MQ->>W: deliver OrderCreated
+    W->>IDB: BEGIN · INSERT inbox_message ON CONFLICT DO NOTHING
+    W->>IDB: SELECT products … FOR UPDATE · reserve stock · COMMIT
+    W->>MQ: basic.ack

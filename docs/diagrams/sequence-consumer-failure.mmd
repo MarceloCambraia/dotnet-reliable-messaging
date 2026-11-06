@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    participant MQ as inventory.order-created
+    participant W as Inventory.Worker
+    participant R as retry.N (TTL queue)
+    participant D as dlx → dlq
+
+    MQ->>W: deliver (x-retry-count = 0)
+    W->>W: handler throws
+    W->>R: publish to retry.1 (x-retry-count = 1) + confirm
+    W->>MQ: basic.ack original
+    Note over R: TTL expires → dead-lettered back to the main queue
+    R->>MQ: message returns
+    MQ->>W: deliver (x-retry-count = 1) … same for retry.2 and retry.3
+    W->>W: handler throws again (retries exhausted)
+    W->>D: publish with x-exception-type / x-exception-message + confirm
+    W->>MQ: basic.ack
+    Note over MQ,D: Poison message (not a valid envelope): basic.nack(requeue=false)<br/>and the broker dead-letters it through the queue's DLX, with no retries

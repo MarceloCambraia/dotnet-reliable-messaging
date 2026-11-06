@@ -1,0 +1,35 @@
+flowchart LR
+    client([Client])
+
+    subgraph orders["Orders service"]
+        api["Orders.Api<br/>Minimal API + MediatR"]
+        pub["Outbox Publisher<br/>BackgroundService"]
+    end
+
+    odb[("Postgres · orders<br/>orders · order_items · outbox_messages")]
+
+    subgraph broker["RabbitMQ"]
+        ex{{"orders.events<br/>topic exchange"}}
+        q[["inventory.order-created<br/>quorum queue"]]
+        rq[["inventory.order-created.retry.1..3<br/>TTL queues"]]
+        dlq[["inventory.order-created.dlq"]]
+    end
+
+    subgraph inventory["Inventory service"]
+        worker["Inventory.Worker<br/>consumer + inbox"]
+    end
+
+    idb[("Postgres · inventory<br/>products · stock_reservations · inbox_messages")]
+    jaeger[("Jaeger")]
+
+    client -->|POST /orders| api
+    api -->|"1 transaction: order + outbox row"| odb
+    pub -->|"SELECT … FOR UPDATE SKIP LOCKED"| odb
+    pub -->|"publish + confirm"| ex
+    ex -->|orders.order-created.v1| q
+    q --> worker
+    worker -->|"1 transaction: inbox row + reservation"| idb
+    worker -.->|handler failed| rq
+    rq -.->|TTL expired| q
+    worker -.->|"retries exhausted / poison"| dlq
+    api & pub & worker -.->|OTLP traces| jaeger
