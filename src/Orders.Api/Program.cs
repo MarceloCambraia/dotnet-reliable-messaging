@@ -1,7 +1,11 @@
 using BuildingBlocks.Messaging;
+using BuildingBlocks.Messaging.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Orders.Api;
 using Orders.Api.Endpoints;
 using Orders.Application;
@@ -22,6 +26,24 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services
     .AddOrdersApplication()
     .AddOrdersInfrastructure(builder.Configuration);
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(builder.Configuration["OTEL_SERVICE_NAME"] ?? "orders-api"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation(options => options.Filter = context =>
+                !context.Request.Path.StartsWithSegments("/health") &&
+                !context.Request.Path.StartsWithSegments("/diagnostics"))
+            .AddHttpClientInstrumentation()
+            .AddNpgsql()
+            .AddSource(MessagingTelemetry.ActivitySourceName);
+
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        {
+            tracing.AddOtlpExporter();
+        }
+    });
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<OrdersDbContext>("postgres", tags: ["ready"])

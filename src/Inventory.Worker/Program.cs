@@ -13,7 +13,9 @@ internal static class Program
             .ReadFrom.Services(services)
             .Enrich.FromLogContext());
 
-        builder.Services.AddInventoryWorker(builder.Configuration);
+        builder.Services
+            .AddInventoryWorker(builder.Configuration)
+            .AddInventoryTelemetry(builder.Configuration);
 
         using var host = builder.Build();
         await host.RunAsync();

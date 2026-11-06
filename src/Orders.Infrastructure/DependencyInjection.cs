@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BuildingBlocks.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -40,6 +41,11 @@ public static class DependencyInjection
 
     internal static void ConfigureDbContext(DbContextOptionsBuilder options, string connectionString) =>
         options
-            .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure())
+            .UseNpgsql(connectionString, npgsql => npgsql
+                .EnableRetryOnFailure()
+                // Only trace SQL that runs inside an existing trace (a request, a publish). Without
+                // this, every idle outbox poll would show up in Jaeger as its own root trace.
+                .ConfigureDataSource(dataSource => dataSource.ConfigureTracing(tracing =>
+                    tracing.ConfigureCommandFilter(_ => Activity.Current is not null))))
             .UseSnakeCaseNamingConvention();
 }
