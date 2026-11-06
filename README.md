@@ -1,7 +1,7 @@
 # dotnet-reliable-messaging
 
-[![CI](https://github.com/OWNER/dotnet-reliable-messaging/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dotnet-reliable-messaging/actions/workflows/ci.yml)
-![Coverage](https://raw.githubusercontent.com/OWNER/dotnet-reliable-messaging/badges/coverage.svg)
+[![CI](https://github.com/MarceloCambraia/dotnet-reliable-messaging/actions/workflows/ci.yml/badge.svg)](https://github.com/MarceloCambraia/dotnet-reliable-messaging/actions/workflows/ci.yml)
+![Coverage](https://raw.githubusercontent.com/MarceloCambraia/dotnet-reliable-messaging/badges/coverage.svg)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 
 A reference implementation of the **Transactional Outbox** and **Idempotent Consumer (Inbox)** patterns
