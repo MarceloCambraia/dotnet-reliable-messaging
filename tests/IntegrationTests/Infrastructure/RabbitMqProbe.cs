@@ -46,7 +46,33 @@ public sealed class RabbitMqProbe : IAsyncDisposable
         return messages;
     }
 
+    public async Task<IReadOnlyList<(IReadOnlyBasicProperties Properties, byte[] Body)>> DrainRawAsync(string queue)
+    {
+        var messages = new List<(IReadOnlyBasicProperties, byte[])>();
+        while (await _channel.BasicGetAsync(queue, autoAck: true) is { } result)
+        {
+            messages.Add((result.BasicProperties, result.Body.ToArray()));
+        }
+
+        return messages;
+    }
+
     public async Task<uint> CountAsync(string queue) => await _channel.MessageCountAsync(queue);
+
+    /// <summary>Consumers attached to <paramref name="queue"/>; 0 if the queue does not exist yet.</summary>
+    public async Task<uint> ConsumerCountAsync(string queue)
+    {
+        // A passive declare of a missing queue closes the channel (404), so use a throwaway one.
+        await using var channel = await _connection.CreateChannelAsync();
+        try
+        {
+            return (await channel.QueueDeclarePassiveAsync(queue)).ConsumerCount;
+        }
+        catch (RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        {
+            return 0;
+        }
+    }
 
     public async Task PublishAsync(string exchange, string routingKey, ReadOnlyMemory<byte> body, string? messageId = null)
     {
