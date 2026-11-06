@@ -1,0 +1,54 @@
+@baseUrl = http://localhost:8080
+
+### Create an order (the response never depends on RabbitMQ)
+# @name createOrder
+POST {{baseUrl}}/orders
+Content-Type: application/json
+X-Correlation-Id: demo-{{$randomInt}}
+
+{
+  "customerId": "customer-42",
+  "items": [
+    { "sku": "SKU-1", "quantity": 2, "unitPrice": 149.90 },
+    { "sku": "SKU-2", "quantity": 1, "unitPrice": 59.90 }
+  ]
+}
+
+### Read it back
+GET {{baseUrl}}/orders/{{createOrder.response.body.$.orderId}}
+
+### Order that inventory rejects (SKU-5 is seeded with zero stock): a business outcome, not an error
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerId": "customer-42",
+  "items": [ { "sku": "SKU-5", "quantity": 1, "unitPrice": 39.90 } ]
+}
+
+### Order whose consumer always fails (docker-compose sets Inventory__FailOnSku=SKU-FAIL): retries, then DLQ
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerId": "customer-42",
+  "items": [ { "sku": "SKU-FAIL", "quantity": 1, "unitPrice": 1.00 } ]
+}
+
+### Invalid order -> 400 problem details, nothing written to the outbox
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerId": "",
+  "items": []
+}
+
+### Outbox state (pending / processed / failed)
+GET {{baseUrl}}/diagnostics/outbox
+
+### Health: Postgres decides readiness; RabbitMQ down only shows as Degraded
+GET {{baseUrl}}/health
+
+###
+GET {{baseUrl}}/health/ready

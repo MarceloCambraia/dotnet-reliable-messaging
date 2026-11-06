@@ -1,0 +1,94 @@
+name: reliable-messaging
+
+# docker compose up --build
+#   API ............ http://localhost:8080   (see Orders.Api.http)
+#   RabbitMQ UI .... http://localhost:15672  (app / app)
+#   Jaeger UI ...... http://localhost:16686
+
+x-dotnet-env: &dotnet-env
+  DOTNET_ENVIRONMENT: Production
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+  RabbitMq__Uri: amqp://app:app@rabbitmq:5672/
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.3-management-alpine
+    hostname: rabbitmq # the node name (and its data directory) depends on it
+    environment:
+      # The built-in "guest" user may only connect from localhost, so use a dedicated one.
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  jaeger:
+    image: jaegertracing/jaeger:2.23.0
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317"   # OTLP gRPC
+
+  orders-api:
+    build:
+      context: .
+      dockerfile: src/Orders.Api/Dockerfile
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: orders-api
+      ConnectionStrings__Orders: Host=postgres;Database=orders;Username=postgres;Password=postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Only for a tidy first start. The API itself does not need the broker to be up.
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: src/Inventory.Worker/Dockerfile
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: inventory-worker
+      ConnectionStrings__Inventory: Host=postgres;Database=inventory;Username=postgres;Password=postgres
+      # Short delays so the retry -> DLQ path can be watched live (defaults are 5s / 30s / 2min).
+      Inventory__RetryDelays__0: "00:00:02"
+      Inventory__RetryDelays__1: "00:00:05"
+      Inventory__RetryDelays__2: "00:00:10"
+      # Demo hook: orders containing this SKU always fail, to show retries and the DLQ.
+      Inventory__FailOnSku: SKU-FAIL
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rabbitmq-data:

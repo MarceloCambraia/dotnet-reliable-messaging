@@ -17,7 +17,7 @@ public sealed class IntegrationCollection : ICollectionFixture<ContainersFixture
 public sealed class ContainersFixture : IAsyncLifetime
 {
     public const string PostgresImage = "postgres:17-alpine";
-    public const string RabbitMqImage = "rabbitmq:4.1-management-alpine";
+    public const string RabbitMqImage = "rabbitmq:4.3-management-alpine";
 
     public PostgreSqlContainer Postgres { get; } = new PostgreSqlBuilder(PostgresImage).Build();
 
