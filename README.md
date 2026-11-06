@@ -329,6 +329,11 @@ first delivery plus three retries, spaced by the retry queues' TTLs (2 s, 5 s, 1
 
 ![Jaeger: consumer retries before the DLQ](docs/screenshots/jaeger-dlq-trace.png)
 
+**The queue topology after that run.** The main queue, three retry tiers (each with its own TTL,
+dead-lettering back to the main queue) and the DLQ holding the failed message. All are quorum queues.
+
+![RabbitMQ queues with retry tiers and DLQ](docs/screenshots/rabbitmq-queues.png)
+
 **The same message in the DLQ.** It keeps its `message_id`, `correlation_id` and `traceparent`, and
 carries `x-retry-count: 3` plus the exception type and message for diagnosis.
 
